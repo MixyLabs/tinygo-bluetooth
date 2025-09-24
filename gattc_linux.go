@@ -32,10 +32,8 @@ func (s DeviceService) UUID() UUID {
 }
 
 // DiscoverServices starts a service discovery procedure. Pass a list of service
-// UUIDs you are interested in to this function. Either a slice of all services
-// is returned (of the same length as the requested UUIDs and in the same
-// order), or if some services could not be discovered an error is returned.
-//
+// UUIDs you are interested in to this function. Returns a slice with every service
+// it could find filtered by argument uuids
 // Passing a nil slice of UUIDs will return a complete list of
 // services.
 //
@@ -63,7 +61,6 @@ func (d Device) DiscoverServices(uuids []UUID) ([]DeviceService, error) {
 
 	services := []DeviceService{}
 	uuidServices := make(map[UUID]struct{})
-	servicesFound := 0
 
 	// Iterate through all objects managed by BlueZ, hoping to find the services
 	// we're looking for.
@@ -104,7 +101,6 @@ func (d Device) DiscoverServices(uuids []UUID) ([]DeviceService, error) {
 
 		if _, ok := uuidServices[serviceUUID]; ok {
 			// There is more than one service with the same UUID?
-			// Don't overwrite it, to keep the servicesFound count correct.
 			continue
 		}
 
@@ -115,12 +111,7 @@ func (d Device) DiscoverServices(uuids []UUID) ([]DeviceService, error) {
 		}
 
 		services = append(services, ds)
-		servicesFound++
 		uuidServices[serviceUUID] = struct{}{}
-	}
-
-	if servicesFound < len(uuids) {
-		return nil, errors.New("bluetooth: could not find some services")
 	}
 
 	return services, nil
