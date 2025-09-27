@@ -225,12 +225,21 @@ func getScanResultFromArgs(args *advertisement.BluetoothLEAdvertisementReceivedE
 		Address: adr,
 	}
 
+	winAdv, err := args.GetAdvertisement()
+	if winAdv != nil {
+		defer winAdv.Release()
+	}
+	if err != nil {
+		return result
+	}
+
 	var manufacturerData []ManufacturerDataElement
-	if winAdv, err := args.GetAdvertisement(); err == nil && winAdv != nil {
-		vector, _ := winAdv.GetManufacturerData()
-		size, _ := vector.GetSize()
-		for i := uint32(0); i < size; i++ {
-			element, _ := vector.GetAt(i)
+	mVector, _ := winAdv.GetManufacturerData()
+	if mVector != nil {
+		defer mVector.Release()
+		mSize, _ := mVector.GetSize()
+		for i := uint32(0); i < mSize; i++ {
+			element, _ := mVector.GetAt(i)
 			manData := (*advertisement.BluetoothLEManufacturerData)(element)
 			companyID, _ := manData.GetCompanyId()
 			buffer, _ := manData.GetData()
@@ -238,6 +247,8 @@ func getScanResultFromArgs(args *advertisement.BluetoothLEAdvertisementReceivedE
 				CompanyID: companyID,
 				Data:      bufferToSlice(buffer),
 			})
+			buffer.Release()
+			manData.Release()
 		}
 	}
 
@@ -263,8 +274,7 @@ func getScanResultFromArgs(args *advertisement.BluetoothLEAdvertisementReceivedE
 	}
 
 	// Note: the IsRandom bit is never set.
-	advertisement, _ := args.GetAdvertisement()
-	localName, _ := advertisement.GetLocalName()
+	localName, _ := winAdv.GetLocalName()
 	result.AdvertisementPayload = &advertisementFields{
 		AdvertisementFields{
 			LocalName:        localName,
