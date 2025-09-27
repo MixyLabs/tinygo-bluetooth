@@ -253,14 +253,15 @@ func getScanResultFromArgs(args *advertisement.BluetoothLEAdvertisementReceivedE
 	}
 
 	var serviceUUIDs []UUID
-	if winAdv, err := args.GetAdvertisement(); err == nil && winAdv != nil {
-		vector, _ := winAdv.GetServiceUuids()
-		size, _ := vector.GetSize()
-		for i := uint32(0); i < size; i++ {
+	sVector, _ := winAdv.GetServiceUuids()
+	if sVector != nil {
+		defer sVector.Release()
+		sSize, _ := sVector.GetSize()
+		for i := uint32(0); i < sSize; i++ {
 			var outGuid syscall.GUID
 			hr, _, _ := syscall.SyscallN(
-				vector.VTable().GetAt,
-				uintptr(unsafe.Pointer(vector)),
+				sVector.VTable().GetAt,
+				uintptr(unsafe.Pointer(sVector)),
 				uintptr(i),
 				uintptr(unsafe.Pointer(&outGuid)),
 			)
