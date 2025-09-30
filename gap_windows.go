@@ -393,8 +393,26 @@ func (a *Adapter) Connect(address Address, params ConnectionParams) (Device, err
 		session: newSession,
 	}
 
-	if a.connectHandler != nil {
-		a.connectHandler(device, true)
+	const SignatureIID_IInspectable string = "cinterface(IInspectable)"
+	guid := winrt.ParameterizedInstanceGUID(foundation.GUIDTypedEventHandler, bluetooth.SignatureBluetoothLEDevice, SignatureIID_IInspectable)
+	connectionStatusChangedEventHandler := foundation.NewTypedEventHandler(ole.NewGUID(guid), func(instance *foundation.TypedEventHandler, sender, args unsafe.Pointer) {
+		if a.connectHandler != nil {
+			status, err := device.device.GetConnectionStatus()
+			if err != nil {
+				return
+			}
+			if status == bluetooth.BluetoothConnectionStatusConnected {
+				a.connectHandler(device, true)
+			} else if status == bluetooth.BluetoothConnectionStatusDisconnected {
+				a.connectHandler(device, false)
+			}
+		}
+	})
+
+	_, err = bleDevice.AddConnectionStatusChanged(connectionStatusChangedEventHandler)
+	if err != nil {
+		connectionStatusChangedEventHandler.Release()
+		return Device{}, fmt.Errorf("error registering connection status handler: %w", err)
 	}
 
 	return device, nil
