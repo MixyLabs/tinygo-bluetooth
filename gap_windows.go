@@ -315,8 +315,10 @@ type Device struct {
 
 	Address Address // the MAC address of the device
 
-	device  *bluetooth.BluetoothLEDevice
-	session *genericattributeprofile.GattSession
+	device                              *bluetooth.BluetoothLEDevice
+	session                             *genericattributeprofile.GattSession
+	connectionStatusChangedEventHandler *foundation.TypedEventHandler
+	connStatusChangedToken              foundation.EventRegistrationToken
 }
 
 // Connect starts a connection attempt to the given peripheral device address.
@@ -409,11 +411,13 @@ func (a *Adapter) Connect(address Address, params ConnectionParams) (Device, err
 		}
 	})
 
-	_, err = bleDevice.AddConnectionStatusChanged(connectionStatusChangedEventHandler)
+	device.connectionStatusChangedEventHandler = connectionStatusChangedEventHandler
+
+	connStatusChangedToken, err := bleDevice.AddConnectionStatusChanged(connectionStatusChangedEventHandler)
 	if err != nil {
-		connectionStatusChangedEventHandler.Release()
 		return Device{}, fmt.Errorf("error registering connection status handler: %w", err)
 	}
+	device.connStatusChangedToken = connStatusChangedToken
 
 	return device, nil
 }
@@ -423,18 +427,18 @@ func (a *Adapter) Connect(address Address, params ConnectionParams) (Device, err
 func (d Device) Disconnect() error {
 	defer d.device.Release()
 	defer d.session.Release()
+	defer d.connectionStatusChangedEventHandler.Release()
 
 	d.cancel()
 
+	if err := d.device.RemoveConnectionStatusChanged(d.connStatusChangedToken); err != nil {
+		return err
+	}
 	if err := d.session.Close(); err != nil {
 		return err
 	}
 	if err := d.device.Close(); err != nil {
 		return err
-	}
-
-	if DefaultAdapter.connectHandler != nil {
-		DefaultAdapter.connectHandler(d, false)
 	}
 
 	return nil
